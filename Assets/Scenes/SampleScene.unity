@@ -5288,7 +5288,6 @@ GameObject:
   m_Component:
   - component: {fileID: 818234638}
   - component: {fileID: 818234639}
-  - component: {fileID: 818234640}
   m_Layer: 0
   m_Name: podvodka_0
   m_TagString: Untagged
@@ -5370,24 +5369,6 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!114 &818234640
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 818234637}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f45db1cb7689b08498be5288171ddf2c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SubmarineController
-  steeringWheel: {fileID: 1945724743}
-  speedLever: {fileID: 252910213}
-  maxSpeed: 5
-  speedSmoothTime: 1.5
-  steerStrength: 60
-  steerSmoothTime: 0.3
 --- !u!1 &893261245
 GameObject:
   m_ObjectHideFlags: 0
@@ -7333,7 +7314,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1400768827}
   - component: {fileID: 1400768826}
-  - component: {fileID: 1400768828}
   m_Layer: 0
   m_Name: Controller
   m_TagString: Untagged
@@ -7371,24 +7351,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1400768828
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1400768825}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 55e15f1e2573cce4386368d08d0baccc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameController
-  submarine: {fileID: 818234640}
-  hpScript: {fileID: 1824828808}
-  deathScreen: {fileID: 1909815792}
-  victoryScreen: {fileID: 1656139106}
-  maxHp: 12
-  hpAnimationThreshold: 4
 --- !u!1 &1402307219
 GameObject:
   m_ObjectHideFlags: 0
