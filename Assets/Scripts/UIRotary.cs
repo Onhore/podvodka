@@ -33,14 +33,11 @@ public class UIRotary : MonoBehaviour,
     [Range(0f, 1f)]
     public float boundaryHardness = 0.5f;
 
-    [Header("Return to Center (Smooth)")]
-    public float returnToCenterForce = 100f;
-    public float returnSpeed = 5f;
-    [Range(0f, 1f)]
-    public float returnSmoothing = 0.8f;
-    public float returnDeadZone = 3f;
-    [Range(0f, 1f)]
-    public float returnDamping = 0.5f;
+    [Header("Return to Center")]
+    public float returnToCenterForce = 80f;
+    [Tooltip("Скорость возврата в градусах/сек — постоянная, без замедления у центра")]
+    public float returnSpeed = 200f;
+    public float returnDeadZone = 1f;
 
     [Header("Rusty Shake")]
     [Range(0f, 5f)]
@@ -185,28 +182,13 @@ public class UIRotary : MonoBehaviour,
 
     private void ApplyReturnToCenter()
     {
-        float distanceToCenter = Mathf.Abs(currentAngle);
-        float maxDistance = Mathf.Max(Mathf.Abs(minAngle), Mathf.Abs(maxAngle));
-        float normalizedDistance = Mathf.Clamp01(distanceToCenter / maxDistance);
-        
-        // Упрощенный расчет силы
-        float smoothFactor = Mathf.Pow(normalizedDistance, 1f + returnSmoothing * 3f);
-        float returnForceMagnitude = returnToCenterForce * smoothFactor * cachedDeltaTime;
-        float returnDirection = -Mathf.Sign(currentAngle);
-        
-        currentAngle += returnDirection * returnForceMagnitude;
-        
-        // Демпфирование только если очень близко
-        if (distanceToCenter < returnDeadZone * 3f)
-        {
-            float dampingFactor = 1f - (distanceToCenter / (returnDeadZone * 3f)) * returnDamping;
-            inertiaVelocity *= dampingFactor;
-        }
-        
-        if (Mathf.Abs(currentAngle) < 0.5f)
+        // MoveTowards — фиксированная скорость градусов/сек, без замедления у центра
+        currentAngle = Mathf.MoveTowards(currentAngle, 0f, returnSpeed * cachedDeltaTime);
+        inertiaVelocity = 0f;
+
+        if (Mathf.Abs(currentAngle) < 0.1f)
         {
             currentAngle = 0f;
-            inertiaVelocity = 0f;
         }
     }
 
