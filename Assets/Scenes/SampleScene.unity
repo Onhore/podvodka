@@ -1043,7 +1043,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &218904886
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1517,7 +1517,7 @@ MonoBehaviour:
   direction: 1
   minValue: 0
   maxValue: 100
-  currentValue: 100
+  currentValue: 0
   useResistance: 1
   dragResistance: 0.87
   inertia: 0
@@ -4975,7 +4975,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &799527123
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6679,7 +6679,8 @@ MonoBehaviour:
   steeringWheel: {fileID: 1945724743}
   speedLever: {fileID: 252910213}
   maxSpeed: 1.5
-  speedSmoothTime: 2
+  speedSmoothTime: 0.4
+  brakeSmoothTime: 0.3
   maxTurnRate: 90
   steerSmoothTime: 0.15
 --- !u!4 &1239702990
@@ -8988,7 +8989,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1656139103
 RectTransform:
   m_ObjectHideFlags: 0
@@ -10762,7 +10763,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1909815791
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11026,7 +11027,7 @@ MonoBehaviour:
   followSpeed: 12
   inertiaDamping: 0.92
   maxInertia: 15
-  resistance: 0.15
+  resistance: 1
   boundarySpringForce: 2
   boundaryHardness: 0.521
   returnToCenterForce: 0
