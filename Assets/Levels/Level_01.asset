@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d62b0788273ff914082086bdcaf2190d, type: 3}
+  m_Name: Level_01
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  boundaryPoints:
+  - {x: -6.6284647, y: 7.478156}
+  - {x: 11.548264, y: 7.6834803}
+  - {x: 15.678711, y: 3.1838162}
+  - {x: 19.23971, y: -2.1828008}
+  - {x: 18.382195, y: -4.746133}
+  - {x: 17.524677, y: -7.3094654}
+  - {x: 10.861472, y: -11.456225}
+  - {x: 5.141856, y: -12.058795}
+  - {x: -3.6118364, y: -12.458242}
+  - {x: -14.405496, y: -1.4608426}
+  pointA: {x: 0, y: -3}
+  pointB: {x: 0, y: 3}
+  boundaryColor: {r: 1, g: 0.06987041, b: 0, a: 0.34117648}
+  lineWidth: 0.05

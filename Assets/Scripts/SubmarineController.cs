@@ -5,23 +5,17 @@ public class SubmarineController : MonoBehaviour
     [Header("References")]
     public UIRotary steeringWheel;
     public UILeaverResistance speedLever;
+    public LevelBoundary[] levelBoundaries;
 
-    [Tooltip("podvodka_0. Visual submarine. Stays in radar center.")]
     public Transform submarineVisual;
-
-    [Tooltip("WorldPivot. Must stay exactly at radar center.")]
     public Transform worldPivot;
-
-    [Tooltip("WorldRotator. Child of WorldPivot. Rotation only.")]
     public Transform worldRotator;
-
-    [Tooltip("WorldContent. Child of WorldRotator. Position offset only.")]
     public Transform worldContent;
 
     [Header("Speed")]
     public float maxSpeed = 1.5f;
-    public float acceleration = 1.5f; // время разгона
-    public float braking = 0.25f;      // время торможения
+    public float acceleration = 1.5f;
+    public float braking = 0.25f;
 
     [Header("Rotation")]
     public float maxTurnRate = 60f;
@@ -31,6 +25,7 @@ public class SubmarineController : MonoBehaviour
     public bool invertSteering = false;
 
     float _currentSpeed;
+    float _speedVelocity;
     float _currentTurnRate;
 
     float _logicalHeading;
@@ -91,8 +86,6 @@ public class SubmarineController : MonoBehaviour
         _logicalHeading += _currentTurnRate * Time.deltaTime;
     }
 
-    float _speedVelocity;
-
     void UpdateSpeed()
     {
         float targetSpeed = 0f;
@@ -103,9 +96,7 @@ public class SubmarineController : MonoBehaviour
         if (targetSpeed < 0.01f)
             targetSpeed = 0f;
 
-        float smoothTime = targetSpeed > _currentSpeed
-            ? acceleration
-            : braking;
+        float smoothTime = targetSpeed > _currentSpeed ? acceleration : braking;
 
         _currentSpeed = Mathf.SmoothDamp(
             _currentSpeed,
@@ -130,40 +121,59 @@ public class SubmarineController : MonoBehaviour
 
         Vector2 forward = new Vector2(
             -Mathf.Sin(rad),
-            Mathf.Cos(rad)
+             Mathf.Cos(rad)
         );
 
-        _logicalPosition += forward * _currentSpeed * Time.deltaTime;
-    }
+        Vector2 movement = forward * _currentSpeed * Time.deltaTime;
+        Vector2 nextPosition = _logicalPosition + movement;
 
+        if (!IsInsideAnyBoundary(nextPosition))
+        {
+            // Мягкий удар о стену:
+            // позицию не меняем, скорость режем, управление оставляем.
+            _currentSpeed *= 0.25f;
+            _speedVelocity = 0f;
+            return;
+        }
+
+        _logicalPosition = nextPosition;
+    }
+    bool IsInsideAnyBoundary(Vector2 position)
+    {
+        if (levelBoundaries == null || levelBoundaries.Length == 0)
+            return true;
+
+        for (int i = 0; i < levelBoundaries.Length; i++)
+        {
+            if (levelBoundaries[i] == null)
+                continue;
+
+            if (levelBoundaries[i].IsInsideBoundary(position))
+                return true;
+        }
+
+        return false;
+    }
     void ApplyVisuals()
     {
-        // 1. Pivot is the radar center. It must never drift.
         if (worldPivot != null)
         {
             worldPivot.localPosition = _pivotStartLocalPosition;
             worldPivot.localRotation = Quaternion.identity;
         }
 
-        // 2. Submarine visual stays in the center and does not move through the world.
         if (submarineVisual != null)
         {
             submarineVisual.localPosition = _submarineStartLocalPosition;
             submarineVisual.localRotation = Quaternion.identity;
         }
 
-        // 3. Rotate the world around the radar center.
         if (worldRotator != null)
         {
             worldRotator.localPosition = Vector3.zero;
-            worldRotator.localRotation = Quaternion.Euler(
-                0f,
-                0f,
-                -_logicalHeading
-            );
+            worldRotator.localRotation = Quaternion.Euler(0f, 0f, -_logicalHeading);
         }
 
-        // 4. Move world content opposite to logical submarine movement.
         if (worldContent != null)
         {
             worldContent.localPosition = new Vector3(
@@ -171,6 +181,7 @@ public class SubmarineController : MonoBehaviour
                 -_logicalPosition.y,
                 0f
             );
+
             worldContent.localRotation = Quaternion.identity;
         }
     }
@@ -178,7 +189,9 @@ public class SubmarineController : MonoBehaviour
     public void ResetWorld()
     {
         _currentSpeed = 0f;
+        _speedVelocity = 0f;
         _currentTurnRate = 0f;
+
         _logicalHeading = 0f;
         _logicalPosition = Vector2.zero;
 
