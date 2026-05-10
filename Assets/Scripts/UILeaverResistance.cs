@@ -2,9 +2,18 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class UILeaverResistance : MonoBehaviour, 
-    IPointerDownHandler, 
-    IDragHandler, 
+/// <summary>
+/// Рычаг скорости.
+/// Логика:
+/// - При зажатой ЛКМ рычаг стремится к позиции курсора по вертикали.
+/// - Минимальная скорость движения к цели — всегда, даже если мышь стоит.
+/// - Максимальная скорость — когда мышь активно двигается к цели.
+/// - Если мышь двигается против направления — рычаг всё равно едет к цели, но с минимальной скоростью.
+/// - При первом клике — НЕ телепортируется, начинает ехать к позиции клика.
+/// </summary>
+public class UILeaverResistance : MonoBehaviour,
+    IPointerDownHandler,
+    IDragHandler,
     IPointerUpHandler,
     IPointerEnterHandler,
     IPointerExitHandler
@@ -12,58 +21,55 @@ public class UILeaverResistance : MonoBehaviour,
     [Header("References")]
     public RectTransform handle;
     public RectTransform background;
-    
+
     [Header("Settings")]
-    public Slider.Direction direction = Slider.Direction.LeftToRight;
+    public Slider.Direction direction = Slider.Direction.RightToLeft;
     public float minValue = 0f;
     public float maxValue = 100f;
     public float currentValue = 50f;
-    
-    [Header("Resistance Settings")]
-    public bool useResistance = true;
-    [Range(0f, 5f)]
-    public float dragResistance = 1f;
-    
-    [Header("Inertia & Damping")]
-    public float inertia = 0.95f;
-    public float damping = 0.5f;
-    
+
+    [Header("Speed")]
+    [Tooltip("Минимальная скорость движения к цели (units/sec) — рычаг всегда едет к курсору")]
+    public float minSpeed = 5f;
+    [Tooltip("Максимальная скорость когда мышь активно двигается к цели")]
+    public float maxSpeed = 80f;
+    [Tooltip("Насколько быстро скорость нарастает от мин до макс при движении мыши")]
+    public float acceleration = 120f;
+
     [Header("Movement Events")]
-    public float movementThreshold = 0.5f; // Порог движения для срабатывания событий
-    public UnityEngine.Events.UnityEvent onMovementStart;  // Начал двигать рычаг (один раз за перетаскивание)
-    public UnityEngine.Events.UnityEvent onMovementStop;   // Остановил движение (но еще не отпустил)
-    public UnityEngine.Events.UnityEvent onGrab;           // Начали тянуть (зажали)
-    public UnityEngine.Events.UnityEvent onRelease;        // Отпустили
-    
+    public float movementThreshold = 0.5f;
+    public UnityEngine.Events.UnityEvent onMovementStart;
+    public UnityEngine.Events.UnityEvent onMovementStop;
+    public UnityEngine.Events.UnityEvent onGrab;
+    public UnityEngine.Events.UnityEvent onRelease;
+
     [Header("Value Events")]
     public UnityEngine.Events.UnityEvent<float> onValueChanged;
-    
+
+    // Runtime
     private bool isDragging;
     private bool isMoving;
     private float lastMovementValue;
     private float movementStopTimer;
-    private float stopDelay = 0.1f; // Задержка для определения остановки
-    
+    private float stopDelay = 0.1f;
+
     private Camera cam;
     private RectTransform rect;
-    private float targetValue;
-    private float currentVelocity;
-    private float dragVelocity;
+    private float targetValue;      // куда едет рычаг (позиция курсора в value-пространстве)
+    private float currentSpeed;     // текущая скорость движения к цели
     private float lastInvokedValue;
-    
+
     void Awake()
     {
         rect = GetComponent<RectTransform>();
-        
+
         if (handle == null)
         {
             handle = GetComponentInChildren<Image>()?.GetComponent<RectTransform>();
             if (handle == null)
-            {
-                Debug.LogError("UILeaver: Handle not assigned!");
-            }
+                Debug.LogError("UILeaverResistance: Handle not assigned!");
         }
-        
+
         if (background == null)
         {
             foreach (Transform child in transform)
@@ -76,7 +82,7 @@ public class UILeaverResistance : MonoBehaviour,
             }
         }
     }
-    
+
     void Start()
     {
         targetValue = currentValue;
@@ -84,228 +90,194 @@ public class UILeaverResistance : MonoBehaviour,
         lastMovementValue = currentValue;
         UpdateHandlePosition();
     }
-    
+
     void Update()
     {
-        if (!isDragging && useResistance)
-        {
-            float acceleration = (targetValue - currentValue) * damping;
-            dragVelocity += acceleration * Time.deltaTime * 10f;
-            dragVelocity *= inertia;
-            
-            currentValue += dragVelocity * Time.deltaTime * 5f;
-            
-            if (Mathf.Abs(dragVelocity) < 0.01f && Mathf.Abs(currentValue - targetValue) < 0.01f)
-            {
-                currentValue = targetValue;
-                dragVelocity = 0f;
-            }
-            
-            currentValue = Mathf.Clamp(currentValue, minValue, maxValue);
-            
-            if (Mathf.Abs(currentValue - targetValue) > 0.01f || Mathf.Abs(dragVelocity) > 0.01f)
-            {
-                UpdateHandlePosition();
-                
-                if (Mathf.Abs(currentValue - lastInvokedValue) > 0.01f)
-                {
-                    onValueChanged?.Invoke(currentValue);
-                    lastInvokedValue = currentValue;
-                }
-            }
-        }
-        
-        // Логика отслеживания движения при перетаскивании
         if (isDragging)
         {
-            float movement = Mathf.Abs(currentValue - lastMovementValue);
-            
-            if (movement > movementThreshold)
-            {
-                if (!isMoving)
-                {
-                    // ТОЛЬКО ЧТО НАЧАЛ ДВИГАТЬ
-                    isMoving = true;
-                    onMovementStart?.Invoke();
-                }
-                
-                // Сбрасываем таймер остановки при движении
-                movementStopTimer = 0f;
-                lastMovementValue = currentValue;
-            }
-            else if (isMoving)
-            {
-                // Нет движения - увеличиваем таймер
-                movementStopTimer += Time.deltaTime;
-                
-                if (movementStopTimer >= stopDelay)
-                {
-                    // ОСТАНОВИЛ ДВИЖЕНИЕ (но все еще держит)
-                    isMoving = false;
-                    onMovementStop?.Invoke();
-                    movementStopTimer = 0f;
-                }
-            }
+            MoveTowardTarget();
+            TrackMovement();
         }
     }
-    
+
+    // ── Движение к цели ─────────────────────────────────────
+
+    private void MoveTowardTarget()
+    {
+        float diff = targetValue - currentValue;
+        if (Mathf.Abs(diff) < 0.01f)
+        {
+            currentSpeed = minSpeed;
+            return;
+        }
+
+        // Направление к цели
+        float direction = Mathf.Sign(diff);
+
+        // Скорость нарастает до maxSpeed, не падает ниже minSpeed
+        currentSpeed = Mathf.Clamp(currentSpeed + acceleration * Time.deltaTime, minSpeed, maxSpeed);
+
+        float step = currentSpeed * Time.deltaTime;
+        currentValue = Mathf.MoveTowards(currentValue, targetValue, step);
+        currentValue = Mathf.Clamp(currentValue, minValue, maxValue);
+
+        UpdateHandlePosition();
+        FireValueChanged();
+    }
+
+    // ── Pointer Events ────────────────────────────────────────
+
     public void OnPointerEnter(PointerEventData eventData) { }
-    
     public void OnPointerExit(PointerEventData eventData) { }
-    
+
     public void OnPointerDown(PointerEventData eventData)
     {
         cam = eventData.pressEventCamera;
         isDragging = true;
         isMoving = false;
-        dragVelocity = 0f;
+        currentSpeed = minSpeed;
         movementStopTimer = 0f;
         lastMovementValue = currentValue;
-        
+
+        // Устанавливаем цель по позиции клика — но НЕ телепортируемся
+        targetValue = GetValueFromPointer(eventData);
+
         DynamicCursor.StartGrab();
-        UpdateValueFromPointer(eventData);
-        
-        // СОБЫТИЕ: Начали тянуть
         onGrab?.Invoke();
     }
-    
+
     public void OnDrag(PointerEventData eventData)
     {
         if (!isDragging) return;
-        UpdateValueFromPointer(eventData);
+
+        float newTarget = GetValueFromPointer(eventData);
+        float mouseDelta = GetMouseDelta(eventData.delta);
+
+        // Если мышь двигается к цели — ускоряемся
+        // Если против — сбрасываем скорость до минимума
+        float dirToTarget = Mathf.Sign(newTarget - currentValue);
+        float mouseDir = Mathf.Sign(mouseDelta);
+
+        if (Mathf.Abs(mouseDelta) > 0.1f && dirToTarget != 0f && mouseDir == dirToTarget)
+        {
+            // Мышь движется к цели — разгоняемся
+            currentSpeed = Mathf.Clamp(currentSpeed + acceleration * Time.deltaTime, minSpeed, maxSpeed);
+        }
+        else
+        {
+            // Мышь стоит или движется против — минимальная скорость
+            currentSpeed = minSpeed;
+        }
+
+        targetValue = newTarget;
     }
-    
+
     public void OnPointerUp(PointerEventData eventData)
     {
         isDragging = false;
-        
-        // Если был в движении - вызываем остановку перед отпусканием
+        currentSpeed = minSpeed;
+
         if (isMoving)
         {
             onMovementStop?.Invoke();
             isMoving = false;
         }
-        
+
         DynamicCursor.EndGrab();
-        
-        // СОБЫТИЕ: Отпустили
         onRelease?.Invoke();
     }
-    
-    private void UpdateValueFromPointer(PointerEventData eventData)
+
+    // ── Вспомогательные ──────────────────────────────────────
+
+    /// <summary>Читает позицию курсора и возвращает value в диапазоне min..max</summary>
+    private float GetValueFromPointer(PointerEventData eventData)
     {
         Vector2 localPoint;
         RectTransform parentRect = background != null ? background : rect;
-        
+
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             parentRect.parent as RectTransform,
             eventData.position,
             cam,
             out localPoint
         );
-        
+
         Rect bounds = parentRect.rect;
-        
-        float normalizedValue = 0f;
-        
-        switch (direction)
+
+        // SpeedLeaver повёрнут на 270° — X в локальных = вертикаль на экране
+        // Движение вверх = больше скорости → нормализуем от xMax к xMin (инверсия)
+        float normalized = Mathf.Clamp01((localPoint.x - bounds.xMin) / bounds.width);
+        // Инвертируем: верх = max
+        normalized = 1f - normalized;
+
+        return Mathf.Lerp(minValue, maxValue, normalized);
+    }
+
+    /// <summary>Читает вертикальное смещение мыши с учётом поворота объекта</summary>
+    private float GetMouseDelta(Vector2 screenDelta)
+    {
+        // SpeedLeaver повёрнут 270° — вертикальное движение мыши = Y
+        return screenDelta.y;
+    }
+
+    private void TrackMovement()
+    {
+        float movement = Mathf.Abs(currentValue - lastMovementValue);
+        if (movement > movementThreshold)
         {
-            case Slider.Direction.LeftToRight:
-                normalizedValue = (localPoint.x - bounds.xMin) / bounds.width;
-                break;
-            case Slider.Direction.RightToLeft:
-                normalizedValue = 1f - (localPoint.x - bounds.xMin) / bounds.width;
-                break;
-            case Slider.Direction.TopToBottom:
-                normalizedValue = 1f - (localPoint.y - bounds.yMin) / bounds.height;
-                break;
-            case Slider.Direction.BottomToTop:
-                normalizedValue = (localPoint.y - bounds.yMin) / bounds.height;
-                break;
-        }
-        
-        float newValue = Mathf.Lerp(minValue, maxValue, Mathf.Clamp01(normalizedValue));
-        
-        if (useResistance)
-        {
-            float resistanceStrength = Mathf.Pow(dragResistance, 1.5f);
-            float moveDelta = newValue - currentValue;
-            float resistanceFactor = 1f / (1f + resistanceStrength * 3f);
-            
-            if (Mathf.Abs(moveDelta) > 0.05f && Mathf.Abs(dragVelocity) < 0.5f)
+            if (!isMoving)
             {
-                resistanceFactor *= 0.3f;
+                isMoving = true;
+                onMovementStart?.Invoke();
             }
-            
-            float step = Mathf.Clamp01(resistanceFactor * 0.5f);
-            currentValue = Mathf.Lerp(currentValue, newValue, step);
-            dragVelocity = (newValue - currentValue) / Time.deltaTime;
-            
-            float maxSpeed = Mathf.Lerp(100f, 15f, dragResistance / 5f);
-            dragVelocity = Mathf.Clamp(dragVelocity, -maxSpeed, maxSpeed);
-            
-            targetValue = newValue;
+            movementStopTimer = 0f;
+            lastMovementValue = currentValue;
         }
-        else
+        else if (isMoving)
         {
-            currentValue = newValue;
-            targetValue = newValue;
+            movementStopTimer += Time.deltaTime;
+            if (movementStopTimer >= stopDelay)
+            {
+                isMoving = false;
+                onMovementStop?.Invoke();
+                movementStopTimer = 0f;
+            }
         }
-        
-        currentValue = Mathf.Clamp(currentValue, minValue, maxValue);
-        UpdateHandlePosition();
-        
+    }
+
+    private void FireValueChanged()
+    {
         if (Mathf.Abs(currentValue - lastInvokedValue) > 0.01f)
         {
             onValueChanged?.Invoke(currentValue);
             lastInvokedValue = currentValue;
         }
     }
-    
+
     private void UpdateHandlePosition()
     {
         if (handle == null) return;
-        
+
         float t = Mathf.InverseLerp(minValue, maxValue, currentValue);
+
         RectTransform parentRect = background != null ? background : rect;
         Rect bounds = parentRect.rect;
-        
         Vector2 anchoredPos = handle.anchoredPosition;
-        
-        switch (direction)
-        {
-            case Slider.Direction.LeftToRight:
-                anchoredPos.x = Mathf.Lerp(bounds.xMin, bounds.xMax, t);
-                break;
-            case Slider.Direction.RightToLeft:
-                anchoredPos.x = Mathf.Lerp(bounds.xMax, bounds.xMin, t);
-                break;
-            case Slider.Direction.TopToBottom:
-                anchoredPos.y = Mathf.Lerp(bounds.yMax, bounds.yMin, t);
-                break;
-            case Slider.Direction.BottomToTop:
-                anchoredPos.y = Mathf.Lerp(bounds.yMin, bounds.yMax, t);
-                break;
-        }
-        
+
+        // SpeedLeaver повёрнут 270° — двигаем по X (= вертикаль на экране)
+        // maxValue = xMin (верх), minValue = xMax (низ) — инверсия
+        anchoredPos.x = Mathf.Lerp(bounds.xMax, bounds.xMin, t);
+
         handle.anchoredPosition = anchoredPos;
     }
-    
+
     public void SetValue(float value, bool invokeEvent = true)
     {
-        targetValue = Mathf.Clamp(value, minValue, maxValue);
-        if (!useResistance)
-        {
-            currentValue = targetValue;
-            UpdateHandlePosition();
-        }
-        
-        if (invokeEvent)
-        {
-            onValueChanged?.Invoke(currentValue);
-            lastInvokedValue = currentValue;
-        }
+        currentValue = Mathf.Clamp(value, minValue, maxValue);
+        targetValue = currentValue;
+        UpdateHandlePosition();
+        if (invokeEvent) FireValueChanged();
     }
-    
+
     public float GetValue() => currentValue;
 }

@@ -1518,10 +1518,9 @@ MonoBehaviour:
   minValue: 0
   maxValue: 100
   currentValue: 0
-  useResistance: 1
-  dragResistance: 0.87
-  inertia: 0
-  damping: 0.5
+  minSpeed: 100
+  maxSpeed: 180
+  acceleration: 220
   movementThreshold: 0.5
   onMovementStart:
     m_PersistentCalls:
