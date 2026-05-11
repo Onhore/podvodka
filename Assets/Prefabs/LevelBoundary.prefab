@@ -85,11 +85,20 @@ LineRenderer:
   m_SortingOrder: -1
   m_MaskInteraction: 0
   m_Positions:
-  - {x: -2.9160643, y: -3.4268317, z: 0}
-  - {x: -2.987896, y: -4.324816, z: 0}
-  - {x: -3.7227407, y: -4.293379, z: 0}
-  - {x: -3.921898, y: -3.004867, z: 0}
-  - {x: -3.0602102, y: -2.4738498, z: 0}
+  - {x: 0.15961787, y: 2.294529, z: 0}
+  - {x: 0.6476429, y: 1.9858019, z: 0}
+  - {x: 1.2734537, y: 1.4835643, z: 0}
+  - {x: 1.4374769, y: 0.5539758, z: 0}
+  - {x: 0.28178, y: -0.13431339, z: 0}
+  - {x: 0.3652727, y: -1.8667434, z: 0}
+  - {x: 0.097804606, y: -2.2706394, z: 0}
+  - {x: -0.49753153, y: -2.1695516, z: 0}
+  - {x: -0.6334094, y: -1.6774949, z: 0}
+  - {x: -0.7431194, y: -0.07919639, z: 0}
+  - {x: -2.2717338, y: 0.43421122, z: 0}
+  - {x: -2.7017934, y: 1.0161022, z: 0}
+  - {x: -2.664641, y: 2.0312426, z: 0}
+  - {x: -1.2650211, y: 2.2194357, z: 0}
   m_Parameters:
     serializedVersion: 3
     widthMultiplier: 1
@@ -192,14 +201,23 @@ EdgeCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_EdgeRadius: 0
+  m_EdgeRadius: 0.25
   m_Points:
-  - {x: -2.9160643, y: -3.4268317}
-  - {x: -2.987896, y: -4.324816}
-  - {x: -3.7227407, y: -4.293379}
-  - {x: -3.921898, y: -3.004867}
-  - {x: -3.0602102, y: -2.4738498}
-  - {x: -2.9160643, y: -3.4268317}
+  - {x: 0.15961787, y: 2.294529}
+  - {x: 0.6476429, y: 1.9858019}
+  - {x: 1.2734537, y: 1.4835643}
+  - {x: 1.4374769, y: 0.5539758}
+  - {x: 0.28178, y: -0.13431339}
+  - {x: 0.3652727, y: -1.8667434}
+  - {x: 0.097804606, y: -2.2706394}
+  - {x: -0.49753153, y: -2.1695516}
+  - {x: -0.6334094, y: -1.6774949}
+  - {x: -0.7431194, y: -0.07919639}
+  - {x: -2.2717338, y: 0.43421122}
+  - {x: -2.7017934, y: 1.0161022}
+  - {x: -2.664641, y: 2.0312426}
+  - {x: -1.2650211, y: 2.2194357}
+  - {x: 0.15961787, y: 2.294529}
   m_AdjacentStartPoint: {x: 0, y: 0}
   m_AdjacentEndPoint: {x: 0, y: 0}
   m_UseAdjacentStartPoint: 0
@@ -216,6 +234,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ed93ce44015d5941a67c3df15f68c3a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp-firstpass::MirrorObjectMover
+  stopMovementWhenTouchingPlayer: 1
+  autoFindBlockingBoundaries: 1
+  ownBoundaries: []
+  enableCrushEscape: 1
+  crushTimeToForceReturn: 1.5
+  forcedReturnDuration: 0.75
+  forcedReturnMoveSpeed: 15
+  forcedReturnRotationSpeed: 240
   visual: {fileID: 0}
   roomAnchor: {fileID: 0}
   logicalPosition: {x: 0, y: 0}
@@ -235,10 +261,10 @@ MonoBehaviour:
   clockwiseRotation: 1
   counterClockwiseRotation: 1
   scaleSource: 0
-  scaleSmoothSpeed: 8
   scaleMultiplier: 0
   minScale: 0.5
   maxScale: 1.5
+  scaleSmoothSpeed: 8
   colorSource: 0
   idleColor: {r: 1, g: 1, b: 1, a: 1}
   activeColor: {r: 0, g: 1, b: 1, a: 1}
@@ -272,6 +298,10 @@ MonoBehaviour:
   - {x: 5, y: 5}
   - {x: 5, y: -5}
   - {x: -5, y: -5}
+  closedLoop: 1
+  boundaryMode: 0
+  logicalRoot: {fileID: 0}
+  openEdgeCollisionRadius: 0.25
   color: {r: 1, g: 0.2, b: 0.2, a: 1}
   lineWidth: 0.05
   curveSteps: 5
