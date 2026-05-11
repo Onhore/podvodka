@@ -4,6 +4,14 @@ using UnityEngine;
 [RequireComponent(typeof(EdgeCollider2D))]
 public class LevelBoundary : MonoBehaviour
 {
+    public enum BoundaryMode
+    {
+        [InspectorName("Level Boundary | внутри можно")]
+        LevelBoundary = 0,
+
+        [InspectorName("Solid Obstacle | внутри нельзя")]
+        SolidObstacle = 1
+    }
     [Header("Data")]
     public LevelData levelData;
 
@@ -20,6 +28,9 @@ public class LevelBoundary : MonoBehaviour
     [Tooltip("Замыкать контур. ON = область, OFF = открытая стена.")]
     public bool closedLoop = true;
 
+    [Header("Collision Logic")]
+    public BoundaryMode boundaryMode =
+    BoundaryMode.LevelBoundary;
     [Header("Collision")]
     [Tooltip("Корень логических координат. Обычно WorldContent. Если пусто — берётся parent.")]
     public Transform logicalRoot;
@@ -110,7 +121,23 @@ public class LevelBoundary : MonoBehaviour
             if (pts.Length < 3)
                 return true;
 
-            return IsPointInsidePolygon(logicalPosition, pts);
+            bool inside =
+                IsPointInsidePolygon(
+                    logicalPosition,
+                    pts
+                );
+
+            switch (boundaryMode)
+            {
+                case BoundaryMode.LevelBoundary:
+                    return inside;
+
+                case BoundaryMode.SolidObstacle:
+                    return !inside;
+
+                default:
+                    return inside;
+            }
         }
 
         return !IsPointTouchingOpenEdge(logicalPosition, pts);

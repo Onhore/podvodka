@@ -4,6 +4,7 @@ using UnityEditor;
 [CustomEditor(typeof(LevelBoundary))]
 public class LevelBoundaryEditor : Editor
 {
+
     int selectedPoint = -1;
 
     readonly Color addButtonColor = new Color(0.45f, 0.85f, 0.45f);
