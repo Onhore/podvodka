@@ -219,7 +219,10 @@ public class MirrorObjectMover : MonoBehaviour
         ApplyVisualScaleAndColor(radarDelta);
     }
 
-    private Vector2 GetRadarMovementDelta(Vector2 logicalDelta, float heading)
+    private Vector2 GetRadarMovementDelta(
+     Vector2 logicalDelta,
+     float heading
+ )
     {
         float amount = logicalDelta.magnitude;
 
@@ -228,51 +231,40 @@ public class MirrorObjectMover : MonoBehaviour
 
         float rad = heading * Mathf.Deg2Rad;
 
-        Vector2 submarineForward = new Vector2(
+        return new Vector2(
             Mathf.Sin(rad),
             Mathf.Cos(rad)
-        );
-
-        // ВАЖНО:
-        // logicalDelta = движение субмарины
-        // worldContent = движение мира наоборот
-        Vector2 worldMovement = -submarineForward * amount;
-
-        return worldMovement;
+        ) * amount;
     }
 
     private void ApplyRootMovement(Vector2 radarDelta)
     {
         Vector2 movementReaction = Vector2.zero;
 
-        if (radarDelta.x < 0f)
+        if (radarDelta.x < -0.000001f)
         {
             float amount = -radarDelta.x;
-
-            movementReaction.x += -amount * GetResponseValue(worldLeft_ObjectX);
-            movementReaction.y += amount * GetResponseValue(worldLeft_ObjectY);
+            movementReaction += Vector2.left * amount * GetResponseValue(worldLeft_ObjectX);
+            movementReaction += Vector2.up * amount * GetResponseValue(worldLeft_ObjectY);
         }
-        else if (radarDelta.x > 0f)
+        else if (radarDelta.x > 0.000001f)
         {
             float amount = radarDelta.x;
-
-            movementReaction.x += amount * GetResponseValue(worldRight_ObjectX);
-            movementReaction.y += amount * GetResponseValue(worldRight_ObjectY);
+            movementReaction += Vector2.right * amount * GetResponseValue(worldRight_ObjectX);
+            movementReaction += Vector2.up * amount * GetResponseValue(worldRight_ObjectY);
         }
 
-        if (radarDelta.y > 0f)
+        if (radarDelta.y > 0.000001f)
         {
             float amount = radarDelta.y;
-
-            movementReaction.x += amount * GetResponseValue(worldUp_ObjectX);
-            movementReaction.y += amount * GetResponseValue(worldUp_ObjectY);
+            movementReaction += Vector2.right * amount * GetResponseValue(worldUp_ObjectX);
+            movementReaction += Vector2.up * amount * GetResponseValue(worldUp_ObjectY);
         }
-        else if (radarDelta.y < 0f)
+        else if (radarDelta.y < -0.000001f)
         {
             float amount = -radarDelta.y;
-
-            movementReaction.x += amount * GetResponseValue(worldDown_ObjectX);
-            movementReaction.y += -amount * GetResponseValue(worldDown_ObjectY);
+            movementReaction += Vector2.right * amount * GetResponseValue(worldDown_ObjectX);
+            movementReaction += Vector2.down * amount * GetResponseValue(worldDown_ObjectY);
         }
 
         mirrorOffset += movementReaction * moveSpeedMultiplier;
