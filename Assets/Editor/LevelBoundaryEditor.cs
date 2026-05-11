@@ -102,6 +102,13 @@ public class LevelBoundaryEditor : Editor
             EditorGUILayout.LabelField("Selected Point", "None");
 
         GUILayout.Space(6);
+        if (GUILayout.Button("Detach"))
+        {
+            var lb = (LevelBoundary)target;
+            Undo.RecordObject(lb, "Detach From LevelData");
+            lb.DetachFromLevelData();
+            EditorUtility.SetDirty(lb);
+        }
 
         DrawDefaultButton("Rebuild", () =>
         {

@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class SubmarineController : MonoBehaviour
 {
+    [Header("Mirror Objects")]
+    [SerializeField] private MirrorObjectMover[] mirrorObjects;
+
     [Header("References")]
     public UIRotary steeringWheel;
     public UILeaverResistance speedLever;
@@ -45,6 +48,8 @@ public class SubmarineController : MonoBehaviour
 
         if (submarineVisual != null)
             _submarineStartLocalPosition = submarineVisual.localPosition;
+
+        UpdateMirrorObjects();
     }
 
     void Update()
@@ -53,6 +58,7 @@ public class SubmarineController : MonoBehaviour
         UpdateSpeed();
         UpdateLogicalPosition();
         ApplyVisuals();
+        UpdateMirrorObjects();
     }
 
     void UpdateHeading()
@@ -129,8 +135,6 @@ public class SubmarineController : MonoBehaviour
 
         if (!IsInsideAnyBoundary(nextPosition))
         {
-            // Мягкий удар о стену:
-            // позицию не меняем, скорость режем, управление оставляем.
             _currentSpeed *= 0.25f;
             _speedVelocity = 0f;
             return;
@@ -138,6 +142,7 @@ public class SubmarineController : MonoBehaviour
 
         _logicalPosition = nextPosition;
     }
+
     bool IsInsideAnyBoundary(Vector2 position)
     {
         if (levelBoundaries == null || levelBoundaries.Length == 0)
@@ -154,6 +159,7 @@ public class SubmarineController : MonoBehaviour
 
         return false;
     }
+
     void ApplyVisuals()
     {
         if (worldPivot != null)
@@ -183,6 +189,27 @@ public class SubmarineController : MonoBehaviour
             );
 
             worldContent.localRotation = Quaternion.identity;
+        }
+    }
+
+    void UpdateMirrorObjects()
+    {
+        if (mirrorObjects == null)
+            return;
+
+        float worldTurnRate = -_currentTurnRate;
+
+        for (int i = 0; i < mirrorObjects.Length; i++)
+        {
+            if (mirrorObjects[i] == null)
+                continue;
+
+            mirrorObjects[i].SetRadarState(
+                _logicalPosition,
+                _logicalHeading,
+                worldTurnRate,
+                Mathf.Abs(_currentSpeed)
+            );
         }
     }
 
@@ -217,6 +244,23 @@ public class SubmarineController : MonoBehaviour
         {
             submarineVisual.localPosition = _submarineStartLocalPosition;
             submarineVisual.localRotation = Quaternion.identity;
+        }
+
+        ResetMirrorObjects();
+        UpdateMirrorObjects();
+    }
+
+    void ResetMirrorObjects()
+    {
+        if (mirrorObjects == null)
+            return;
+
+        for (int i = 0; i < mirrorObjects.Length; i++)
+        {
+            if (mirrorObjects[i] == null)
+                continue;
+
+            mirrorObjects[i].ResetMirror();
         }
     }
 }

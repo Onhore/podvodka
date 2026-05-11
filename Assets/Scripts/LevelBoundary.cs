@@ -111,7 +111,10 @@ public class LevelBoundary : MonoBehaviour
 
     public Vector2[] GetPoints()
     {
-        return levelData != null ? levelData.boundaryPoints : points;
+        if (levelData != null && levelData.boundaryPoints != null)
+            return levelData.boundaryPoints;
+
+        return points;
     }
 
     public void SetPoints(Vector2[] newPoints)
@@ -120,6 +123,18 @@ public class LevelBoundary : MonoBehaviour
             levelData.boundaryPoints = newPoints;
         else
             points = newPoints;
+
+        Build();
+    }
+    public void DetachFromLevelData()
+    {
+        if (levelData == null)
+            return;
+
+        points = (Vector2[])levelData.boundaryPoints.Clone();
+        color = levelData.boundaryColor;
+        lineWidth = levelData.lineWidth;
+        levelData = null;
 
         Build();
     }
@@ -133,4 +148,6 @@ public class LevelBoundary : MonoBehaviour
     {
         return levelData != null ? levelData.lineWidth : lineWidth;
     }
+
+
 }

@@ -10,18 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d62b0788273ff914082086bdcaf2190d, type: 3}
-  m_Name: Level_01
+  m_Name: Level_02
   m_EditorClassIdentifier: Assembly-CSharp::LevelData
   boundaryPoints:
-  - {x: -2.9977655, y: 15.737168}
-  - {x: -1.3527813, y: 2.9045794}
-  - {x: 3.4610286, y: 1.4128532}
-  - {x: 12.315156, y: 2.0310657}
-  - {x: 3.7240434, y: -9.243918}
-  - {x: -3.061173, y: -2.751654}
-  - {x: -13.886705, y: -10.445388}
-  - {x: -14.7121315, y: 0.9276149}
+  - {x: -2.9160643, y: -3.4268317}
+  - {x: -2.987896, y: -4.324816}
+  - {x: -3.7227407, y: -4.293379}
+  - {x: -3.921898, y: -3.004867}
+  - {x: -3.0602102, y: -2.4738498}
   pointA: {x: 0, y: -3}
   pointB: {x: 0, y: 3}
-  boundaryColor: {r: 1, g: 0.06987041, b: 0, a: 0.34117648}
+  boundaryColor: {r: 1, g: 0.8028576, b: 0, a: 0.34117648}
   lineWidth: 0.05
