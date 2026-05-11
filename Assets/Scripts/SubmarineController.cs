@@ -2,8 +2,35 @@ using UnityEngine;
 
 public class SubmarineController : MonoBehaviour
 {
+    [Header("Auto Find")]
+    [SerializeField] private bool autoFindSceneObjectsOnAwake = true;
+    [SerializeField] private bool includeInactiveObjects = true;
+
     [Header("Mirror Objects")]
     [SerializeField] private MirrorObjectMover[] mirrorObjects;
+
+    [Header("Pushback")]
+    [SerializeField] private bool useBoundaryPushback = true;
+
+    [Header("Rotation Lock")]
+    [SerializeField] private bool lockRotationOnCollision = true;
+    [SerializeField]
+    private float rotationLockContactDelay = 0.15f;
+
+    private float collisionContactTimer;
+    [SerializeField]
+    private float rotationLockDuration = 0.25f;
+
+    private float rotationLockTimer;
+
+    [SerializeField]
+    private int pushbackIterations = 4;
+
+    [SerializeField]
+    private float pushbackStrength = 1.05f;
+
+    [SerializeField]
+    private float pushbackStep = 0.05f;
 
     [Header("References")]
     public UIRotary steeringWheel;
@@ -24,6 +51,10 @@ public class SubmarineController : MonoBehaviour
     public float maxTurnRate = 60f;
     public float turnAcceleration = 6f;
 
+    [Header("Collision Check")]
+    [SerializeField] private int collisionSweepSteps = 8;
+    [SerializeField] private bool checkCollisionEvenWhenStopped = true;
+
     [Header("Options")]
     public bool invertSteering = false;
 
@@ -41,6 +72,12 @@ public class SubmarineController : MonoBehaviour
     public float LogicalHeading => _logicalHeading;
     public Vector2 LogicalPosition => _logicalPosition;
 
+    void Awake()
+    {
+        if (autoFindSceneObjectsOnAwake)
+            FindSceneObjects();
+    }
+
     void Start()
     {
         if (worldPivot != null)
@@ -51,18 +88,95 @@ public class SubmarineController : MonoBehaviour
 
         UpdateMirrorObjects();
     }
-
+    private bool rotationWasLockedByCollision;
     void Update()
     {
         UpdateHeading();
         UpdateSpeed();
-        UpdateLogicalPosition();
+
+        // Сначала обновляем визуал мира
         ApplyVisuals();
+
+        // Потом обновляем динамичные mirror/boundary объекты
         UpdateMirrorObjects();
+
+        // Проверяем:
+        // не въехала ли динамичная стена в игрока
+        if (!IsInsideAnyBoundary(_logicalPosition))
+        {
+            if (useBoundaryPushback)
+            {
+                ResolveBoundaryPenetration();
+            }
+
+            _currentSpeed = 0f;
+            _speedVelocity = 0f;
+
+            collisionContactTimer += Time.deltaTime;
+
+            if (
+                lockRotationOnCollision &&
+                !rotationWasLockedByCollision &&
+                collisionContactTimer >= rotationLockContactDelay
+            )
+            {
+                rotationLockTimer = rotationLockDuration;
+                rotationWasLockedByCollision = true;
+            }
+
+            if (IsInsideAnyBoundary(_logicalPosition))
+            {
+                collisionContactTimer = 0f;
+            }
+        }
+
+        // Теперь двигаем игрока
+        UpdateLogicalPosition();
+
+        // После движения ещё раз обновляем мир
+        ApplyVisuals();
+
+        // И ещё раз обновляем mirror объекты
+        UpdateMirrorObjects();
+        if (useBoundaryPushback)
+            ResolveBoundaryPushback();
+        // Финальная проверка после всех движений
+        if (!IsInsideAnyBoundary(_logicalPosition))
+        {
+            _currentSpeed = 0f;
+            _speedVelocity = 0f;
+        }
+    }
+
+    void FindSceneObjects()
+    {
+        if (includeInactiveObjects)
+        {
+            mirrorObjects = FindObjectsOfType<MirrorObjectMover>(true);
+            levelBoundaries = FindObjectsOfType<LevelBoundary>(true);
+        }
+        else
+        {
+            mirrorObjects = FindObjectsOfType<MirrorObjectMover>();
+            levelBoundaries = FindObjectsOfType<LevelBoundary>();
+        }
     }
 
     void UpdateHeading()
     {
+        if (rotationLockTimer > 0f)
+        {
+            rotationLockTimer -= Time.deltaTime;
+
+            _currentTurnRate = 0f;
+
+            if (rotationLockTimer <= 0f)
+                rotationWasLockedByCollision = false;
+
+            return;
+        }
+
+
         float wheelNorm = 0f;
 
         if (steeringWheel != null)
@@ -121,7 +235,15 @@ public class SubmarineController : MonoBehaviour
     void UpdateLogicalPosition()
     {
         if (Mathf.Abs(_currentSpeed) < 0.0001f)
+        {
+            if (checkCollisionEvenWhenStopped && !IsInsideAnyBoundary(_logicalPosition))
+            {
+                _currentSpeed = 0f;
+                _speedVelocity = 0f;
+            }
+
             return;
+        }
 
         float rad = _logicalHeading * Mathf.Deg2Rad;
 
@@ -133,14 +255,30 @@ public class SubmarineController : MonoBehaviour
         Vector2 movement = forward * _currentSpeed * Time.deltaTime;
         Vector2 nextPosition = _logicalPosition + movement;
 
-        if (!IsInsideAnyBoundary(nextPosition))
+        if (!IsPathClear(_logicalPosition, nextPosition))
         {
-            _currentSpeed *= 0.25f;
+            _currentSpeed = 0f;
             _speedVelocity = 0f;
             return;
         }
 
         _logicalPosition = nextPosition;
+    }
+
+    bool IsPathClear(Vector2 from, Vector2 to)
+    {
+        int steps = Mathf.Max(1, collisionSweepSteps);
+
+        for (int i = 1; i <= steps; i++)
+        {
+            float t = i / (float)steps;
+            Vector2 checkPosition = Vector2.Lerp(from, to, t);
+
+            if (!IsInsideAnyBoundary(checkPosition))
+                return false;
+        }
+
+        return true;
     }
 
     bool IsInsideAnyBoundary(Vector2 position)
@@ -150,14 +288,22 @@ public class SubmarineController : MonoBehaviour
 
         for (int i = 0; i < levelBoundaries.Length; i++)
         {
-            if (levelBoundaries[i] == null)
+            LevelBoundary boundary = levelBoundaries[i];
+
+            if (boundary == null)
                 continue;
 
-            if (levelBoundaries[i].IsInsideBoundary(position))
-                return true;
+            if (!boundary.gameObject.activeInHierarchy)
+                continue;
+
+            if (!boundary.enabled)
+                continue;
+
+            if (!boundary.IsInsideBoundary(position))
+                return false;
         }
 
-        return false;
+        return true;
     }
 
     void ApplyVisuals()
@@ -261,6 +407,87 @@ public class SubmarineController : MonoBehaviour
                 continue;
 
             mirrorObjects[i].ResetMirror();
+        }
+    }
+
+    void ResolveBoundaryPenetration()
+    {
+        Vector2 original = _logicalPosition;
+
+        for (int i = 0; i < pushbackIterations; i++)
+        {
+            if (IsInsideAnyBoundary(_logicalPosition))
+                return;
+
+            Vector2 bestDirection = Vector2.zero;
+            float bestDistance = float.MaxValue;
+
+            Vector2[] directions =
+            {
+            Vector2.up,
+            Vector2.down,
+            Vector2.left,
+            Vector2.right,
+            new Vector2(1f, 1f).normalized,
+            new Vector2(-1f, 1f).normalized,
+            new Vector2(1f, -1f).normalized,
+            new Vector2(-1f, -1f).normalized
+        };
+
+            for (int d = 0; d < directions.Length; d++)
+            {
+                Vector2 test =
+                    _logicalPosition +
+                    directions[d] * pushbackStep;
+
+                if (IsInsideAnyBoundary(test))
+                {
+                    float dist = Vector2.Distance(original, test);
+
+                    if (dist < bestDistance)
+                    {
+                        bestDistance = dist;
+                        bestDirection = directions[d];
+                    }
+                }
+            }
+
+            if (bestDirection == Vector2.zero)
+                return;
+
+            _logicalPosition += bestDirection * pushbackStep;
+        }
+    }
+    void ResolveBoundaryPushback()
+    {
+        if (levelBoundaries == null)
+            return;
+
+        for (int iteration = 0; iteration < pushbackIterations; iteration++)
+        {
+            Vector2 totalPush = Vector2.zero;
+
+            for (int i = 0; i < levelBoundaries.Length; i++)
+            {
+                LevelBoundary boundary = levelBoundaries[i];
+
+                if (boundary == null)
+                    continue;
+
+                if (!boundary.gameObject.activeInHierarchy)
+                    continue;
+
+                if (!boundary.enabled)
+                    continue;
+
+                if (boundary.TryGetPushOut(_logicalPosition, out Vector2 push))
+                    totalPush += push;
+            }
+
+            if (totalPush.sqrMagnitude < 0.000001f)
+                return;
+
+            _logicalPosition += totalPush * pushbackStrength;
         }
     }
 }

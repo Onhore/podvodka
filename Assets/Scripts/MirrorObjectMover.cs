@@ -33,10 +33,33 @@ public class MirrorObjectMover : MonoBehaviour
         MovementAndRotation = 3
     }
 
+    [Header("Player Blocking")]
+    public bool stopMovementWhenTouchingPlayer = true;
+    public bool autoFindBlockingBoundaries = true;
+    [SerializeField] private LevelBoundary[] ownBoundaries;
+
+    [Header("Crush Escape")]
+    [Tooltip("Если стена долго упирается в игрока, она временно уходит назад.")]
+    public bool enableCrushEscape = true;
+
+    [Tooltip("Сколько секунд стена может давить игрока перед forced return.")]
+    [Range(0.1f, 10f)]
+    public float crushTimeToForceReturn = 1.5f;
+
+    [Tooltip("Сколько секунд длится forced return. Если стена успеет вернуться раньше — режим закончится раньше.")]
+    [Range(0.05f, 10f)]
+    public float forcedReturnDuration = 0.75f;
+
+    [Tooltip("Скорость forced return позиции.")]
+    [Range(0.1f, 100f)]
+    public float forcedReturnMoveSpeed = 15f;
+
+    [Tooltip("Скорость forced return вращения.")]
+    [Range(1f, 720f)]
+    public float forcedReturnRotationSpeed = 240f;
+
     [Header("Hierarchy")]
     public Transform visual;
-
-    [Tooltip("Центр комнаты.")]
     public Transform roomAnchor;
 
     [Header("Source")]
@@ -46,7 +69,7 @@ public class MirrorObjectMover : MonoBehaviour
     [SerializeField] private float playerSpeed;
 
     [Header("Movement Speed")]
-    [Range(-2f, 2f)]
+    [Range(-5f, 5f)]
     public float moveSpeedMultiplier = 1f;
 
     [Header("Mirror Response X")]
@@ -73,18 +96,19 @@ public class MirrorObjectMover : MonoBehaviour
 
     [Header("Scale Effect")]
     public EffectSource scaleSource = EffectSource.Off;
-    [Tooltip("Плавность изменения размера. Чем больше — тем быстрее.")]
-    [Range(0.1f, 30f)]
-    public float scaleSmoothSpeed = 8f;
 
     [Range(-5f, 5f)]
     public float scaleMultiplier = 0f;
 
-    [Range(0.01f, 5f)]
+    [Range(0.1f, 5f)]
     public float minScale = 0.5f;
 
     [Range(0.1f, 5f)]
     public float maxScale = 1.5f;
+
+    [Tooltip("Плавность изменения размера. Чем больше — тем быстрее.")]
+    [Range(0.1f, 30f)]
+    public float scaleSmoothSpeed = 8f;
 
     [Header("Color Effect")]
     public EffectSource colorSource = EffectSource.Off;
@@ -100,7 +124,7 @@ public class MirrorObjectMover : MonoBehaviour
     public float roomRadius = 80f;
 
     [Header("Activation Zone")]
-    [Range(0f, 12f)]
+    [Range(0f, 500f)]
     public float activationRadius = 150f;
 
     public bool returnToStartOutsideZone = true;
@@ -137,6 +161,10 @@ public class MirrorObjectMover : MonoBehaviour
     private Vector2 mirrorOffset;
     private float mirrorRotationOffset;
 
+    private float crushTimer;
+    private bool forcedReturning;
+    private float forcedReturnTimer;
+
     private SpriteRenderer spriteRenderer;
 
     private void Awake()
@@ -149,6 +177,9 @@ public class MirrorObjectMover : MonoBehaviour
         startVisualLocalScale = visual.localScale;
 
         spriteRenderer = visual.GetComponent<SpriteRenderer>();
+
+        if (autoFindBlockingBoundaries)
+            ownBoundaries = GetComponentsInChildren<LevelBoundary>(true);
 
         lastLogicalPosition = logicalPosition;
         hasRadarSample = false;
@@ -181,6 +212,10 @@ public class MirrorObjectMover : MonoBehaviour
         mirrorOffset = Vector2.zero;
         mirrorRotationOffset = 0f;
 
+        crushTimer = 0f;
+        forcedReturnTimer = 0f;
+        forcedReturning = false;
+
         hasRadarSample = false;
         lastLogicalPosition = logicalPosition;
 
@@ -201,28 +236,89 @@ public class MirrorObjectMover : MonoBehaviour
         Vector2 logicalDelta = logicalPosition - lastLogicalPosition;
         lastLogicalPosition = logicalPosition;
 
-        Vector2 radarDelta = GetRadarMovementDelta(
-            logicalDelta,
-            logicalHeading
-        );
+        if (forcedReturning)
+        {
+            TickForcedReturn();
+            return;
+        }
+
+        Vector2 radarDelta = GetRadarMovementDelta(logicalDelta, logicalHeading);
 
         bool insideActivationZone = IsInsideActivationZone();
 
         if (!insideActivationZone && returnToStartOutsideZone)
         {
+            crushTimer = 0f;
             ReturnToStart();
             return;
         }
 
-        ApplyRootMovement(radarDelta);
+        bool movementWasBlocked = ApplyRootMovement(radarDelta);
+
+        if (movementWasBlocked)
+        {
+            HandleCrushTimer();
+            return;
+        }
+
+        crushTimer = 0f;
+
         ApplyVisualRotation();
         ApplyVisualScaleAndColor(radarDelta);
     }
 
-    private Vector2 GetRadarMovementDelta(
-     Vector2 logicalDelta,
-     float heading
- )
+    private void HandleCrushTimer()
+    {
+        if (!enableCrushEscape)
+            return;
+
+        crushTimer += Time.deltaTime;
+
+        if (crushTimer >= crushTimeToForceReturn)
+            BeginForcedReturn();
+    }
+
+    private void BeginForcedReturn()
+    {
+        forcedReturning = true;
+        forcedReturnTimer = 0f;
+        crushTimer = 0f;
+    }
+
+    private void TickForcedReturn()
+    {
+        forcedReturnTimer += Time.deltaTime;
+
+        StepReturnToStart(
+            forcedReturnMoveSpeed,
+            forcedReturnRotationSpeed
+        );
+
+        bool reachedStart = IsReturnedToStart();
+        bool timeExpired = forcedReturnTimer >= forcedReturnDuration;
+
+        if (reachedStart || timeExpired)
+        {
+            forcedReturning = false;
+            forcedReturnTimer = 0f;
+            crushTimer = 0f;
+        }
+    }
+
+    private bool IsReturnedToStart()
+    {
+        bool positionDone = mirrorOffset.sqrMagnitude < 0.0001f;
+        bool rotationDone = Mathf.Abs(mirrorRotationOffset) < 0.1f;
+
+        bool scaleDone = true;
+
+        if (visual != null)
+            scaleDone = Vector3.Distance(visual.localScale, startVisualLocalScale) < 0.001f;
+
+        return positionDone && rotationDone && scaleDone;
+    }
+
+    private Vector2 GetRadarMovementDelta(Vector2 logicalDelta, float heading)
     {
         float amount = logicalDelta.magnitude;
 
@@ -237,19 +333,21 @@ public class MirrorObjectMover : MonoBehaviour
         ) * amount;
     }
 
-    private void ApplyRootMovement(Vector2 radarDelta)
+    private bool ApplyRootMovement(Vector2 radarDelta)
     {
         Vector2 movementReaction = Vector2.zero;
 
         if (radarDelta.x < -0.000001f)
         {
             float amount = -radarDelta.x;
+
             movementReaction += Vector2.left * amount * GetResponseValue(worldLeft_ObjectX);
             movementReaction += Vector2.up * amount * GetResponseValue(worldLeft_ObjectY);
         }
         else if (radarDelta.x > 0.000001f)
         {
             float amount = radarDelta.x;
+
             movementReaction += Vector2.right * amount * GetResponseValue(worldRight_ObjectX);
             movementReaction += Vector2.up * amount * GetResponseValue(worldRight_ObjectY);
         }
@@ -257,15 +355,20 @@ public class MirrorObjectMover : MonoBehaviour
         if (radarDelta.y > 0.000001f)
         {
             float amount = radarDelta.y;
+
             movementReaction += Vector2.right * amount * GetResponseValue(worldUp_ObjectX);
             movementReaction += Vector2.up * amount * GetResponseValue(worldUp_ObjectY);
         }
         else if (radarDelta.y < -0.000001f)
         {
             float amount = -radarDelta.y;
+
             movementReaction += Vector2.right * amount * GetResponseValue(worldDown_ObjectX);
             movementReaction += Vector2.down * amount * GetResponseValue(worldDown_ObjectY);
         }
+
+        Vector2 oldOffset = mirrorOffset;
+        Vector3 oldLocalPosition = transform.localPosition;
 
         mirrorOffset += movementReaction * moveSpeedMultiplier;
 
@@ -279,6 +382,15 @@ public class MirrorObjectMover : MonoBehaviour
             mirrorOffset.y,
             0f
         );
+
+        if (stopMovementWhenTouchingPlayer && IsTouchingPlayer())
+        {
+            mirrorOffset = oldOffset;
+            transform.localPosition = oldLocalPosition;
+            return true;
+        }
+
+        return false;
     }
 
     private void ApplyVisualRotation()
@@ -322,7 +434,12 @@ public class MirrorObjectMover : MonoBehaviour
         if (scaleSource != EffectSource.Off)
         {
             float targetScaleFactor = 1f + scalePower * scaleMultiplier;
-            targetScaleFactor = Mathf.Clamp(targetScaleFactor, minScale, maxScale);
+
+            targetScaleFactor = Mathf.Clamp(
+                targetScaleFactor,
+                minScale,
+                maxScale
+            );
 
             Vector3 targetScale = startVisualLocalScale * targetScaleFactor;
 
@@ -335,9 +452,7 @@ public class MirrorObjectMover : MonoBehaviour
 
         if (colorSource != EffectSource.Off && spriteRenderer != null)
         {
-            float t = Mathf.Clamp01(
-                colorPower * colorMultiplier
-            );
+            float t = Mathf.Clamp01(colorPower * colorMultiplier);
 
             spriteRenderer.color = Color.Lerp(
                 idleColor,
@@ -345,6 +460,31 @@ public class MirrorObjectMover : MonoBehaviour
                 t
             );
         }
+    }
+
+    private bool IsTouchingPlayer()
+    {
+        if (ownBoundaries == null || ownBoundaries.Length == 0)
+            return false;
+
+        for (int i = 0; i < ownBoundaries.Length; i++)
+        {
+            LevelBoundary boundary = ownBoundaries[i];
+
+            if (boundary == null)
+                continue;
+
+            if (!boundary.gameObject.activeInHierarchy)
+                continue;
+
+            if (!boundary.enabled)
+                continue;
+
+            if (!boundary.IsInsideBoundary(logicalPosition))
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsInsideActivationZone()
@@ -383,19 +523,28 @@ public class MirrorObjectMover : MonoBehaviour
         if (returnSpeedMultiplier <= 0f && returnRotationSpeedMultiplier <= 0f)
             return;
 
+        float moveReturnSpeed =
+            playerSpeed *
+            Mathf.Abs(moveSpeedMultiplier) *
+            returnSpeedMultiplier;
+
+        float rotationReturnSpeed =
+            playerSpeed *
+            returnRotationSpeedMultiplier;
+
+        StepReturnToStart(moveReturnSpeed, rotationReturnSpeed);
+    }
+
+    private void StepReturnToStart(float moveSpeed, float rotationSpeed)
+    {
         Vector3 roomCenter = GetRoomCenterLocal();
 
-        if (returnSpeedMultiplier > 0f)
+        if (moveSpeed > 0f)
         {
-            float moveReturnSpeed =
-                playerSpeed *
-                Mathf.Abs(moveSpeedMultiplier) *
-                returnSpeedMultiplier;
-
             mirrorOffset = Vector2.MoveTowards(
                 mirrorOffset,
                 Vector2.zero,
-                moveReturnSpeed * Time.deltaTime
+                moveSpeed * Time.deltaTime
             );
 
             transform.localPosition = roomCenter + new Vector3(
@@ -409,32 +558,26 @@ public class MirrorObjectMover : MonoBehaviour
                 visual.localScale = Vector3.MoveTowards(
                     visual.localScale,
                     startVisualLocalScale,
-                    moveReturnSpeed * Time.deltaTime
+                    moveSpeed * Time.deltaTime
                 );
             }
 
             if (spriteRenderer != null)
             {
-                float colorReturnSpeed = moveReturnSpeed * Time.deltaTime;
-
                 spriteRenderer.color = Color.Lerp(
                     spriteRenderer.color,
                     idleColor,
-                    Mathf.Clamp01(colorReturnSpeed)
+                    Mathf.Clamp01(moveSpeed * Time.deltaTime)
                 );
             }
         }
 
-        if (returnRotationSpeedMultiplier > 0f)
+        if (rotationSpeed > 0f)
         {
-            float rotationReturnSpeed =
-                playerSpeed *
-                returnRotationSpeedMultiplier;
-
             mirrorRotationOffset = Mathf.MoveTowards(
                 mirrorRotationOffset,
                 0f,
-                rotationReturnSpeed * Time.deltaTime
+                rotationSpeed * Time.deltaTime
             );
 
             if (visual != null)
@@ -446,20 +589,14 @@ public class MirrorObjectMover : MonoBehaviour
         }
     }
 
-    private float GetEffectPower(
-    EffectSource source,
-    Vector2 radarDelta
-)
+    private float GetEffectPower(EffectSource source, Vector2 radarDelta)
     {
         float movementPower = 0f;
 
-        if (radarDelta.sqrMagnitude > 0.000001f)
-        {
-            movementPower =
-                Mathf.Abs(radarDelta.x) > Mathf.Abs(radarDelta.y)
-                    ? radarDelta.x
-                    : radarDelta.y;
-        }
+        if (Mathf.Abs(radarDelta.x) > Mathf.Abs(radarDelta.y))
+            movementPower = radarDelta.x;
+        else
+            movementPower = radarDelta.y;
 
         float rotationPower =
             worldTurnRate * Time.deltaTime;
@@ -552,10 +689,7 @@ public class MirrorObjectMover : MonoBehaviour
         return transform.localPosition;
     }
 
-    private void DrawRoomDiscLocal(
-        Vector3 localCenter,
-        float radius
-    )
+    private void DrawRoomDiscLocal(Vector3 localCenter, float radius)
     {
         if (radius <= 0f)
             return;
@@ -593,10 +727,7 @@ public class MirrorObjectMover : MonoBehaviour
         Handles.matrix = oldMatrix;
     }
 
-    private void DrawActivationDiscLocal(
-        Vector3 localCenter,
-        float radius
-    )
+    private void DrawActivationDiscLocal(Vector3 localCenter, float radius)
     {
         if (radius <= 0f)
             return;
